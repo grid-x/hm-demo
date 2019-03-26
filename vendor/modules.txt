@@ -1,0 +1,48 @@
+# github.com/eclipse/paho.mqtt.golang v1.1.1
+github.com/eclipse/paho.mqtt.golang
+github.com/eclipse/paho.mqtt.golang/packets
+# github.com/konsorten/go-windows-terminal-sequences v1.0.1
+github.com/konsorten/go-windows-terminal-sequences
+# github.com/sirupsen/logrus v1.4.0
+github.com/sirupsen/logrus
+# github.com/spf13/pflag v1.0.3
+github.com/spf13/pflag
+# golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/net v0.0.0-20190326090315-15845e8f865b
+golang.org/x/net/proxy
+golang.org/x/net/websocket
+golang.org/x/net/internal/socks
+# golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# periph.io/x/periph v3.4.0+incompatible
+periph.io/x/periph/conn/physic
+periph.io/x/periph/conn/spi
+periph.io/x/periph/conn/spi/spireg
+periph.io/x/periph/host
+periph.io/x/periph/conn
+periph.io/x/periph/conn/gpio
+periph.io/x/periph/conn/pin
+periph.io/x/periph
+periph.io/x/periph/host/allwinner
+periph.io/x/periph/host/am335x
+periph.io/x/periph/host/bcm283x
+periph.io/x/periph/host/beagle/bone
+periph.io/x/periph/host/beagle/green
+periph.io/x/periph/host/chip
+periph.io/x/periph/host/odroidc1
+periph.io/x/periph/host/pine64
+periph.io/x/periph/host/rpi
+periph.io/x/periph/host/sysfs
+periph.io/x/periph/conn/gpio/gpioreg
+periph.io/x/periph/host/cpu
+periph.io/x/periph/host/distro
+periph.io/x/periph/host/pmem
+periph.io/x/periph/conn/gpio/gpiostream
+periph.io/x/periph/host/videocore
+periph.io/x/periph/conn/pin/pinreg
+periph.io/x/periph/host/beagle/black
+periph.io/x/periph/host/fs
+periph.io/x/periph/conn/i2c
+periph.io/x/periph/conn/i2c/i2creg
