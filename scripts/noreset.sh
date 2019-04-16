@@ -1,3 +1,3 @@
 #! /bin/bash 
-gpio write 11
+gpio write 1 1
 exit 0
