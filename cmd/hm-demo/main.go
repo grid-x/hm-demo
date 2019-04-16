@@ -12,18 +12,20 @@ import (
 	"periph.io/x/periph/conn/spi"
 	"periph.io/x/periph/conn/spi/spireg"
 	"periph.io/x/periph/host"
+	crc "github.com/howeyc/crc16"
 )
+
 
 func main() {
 	var (
 		logger = log.New()
 
-		mqttBroker = flag.String("mqtt.broker", "tcp://192.168.192.107:1883", "Broker to connect to")
+		mqttBroker = flag.String("mqtt.broker", "tcp://192.168.0.107:1883", "Broker to connect to")
 
 		spiDev      = flag.String("spi.dev", "SPI1.0", "SPI port")
 		spiMode     = flag.Int("spi.mode", 0x0, "Communication Mode")
 		spiBits     = flag.Int("spi.bits", 8, "Number of bits per word")
-		spiMaxSpeed = flag.Int64("spi.max-speed", 28000000000, "Maximum rated speed by the device's spec in µHz")
+		spiMaxSpeed = flag.Int64("spi.max-speed", 40000000000, "Maximum rated speed by the device's spec in µHz")
 	)
 	flag.Parse()
 
@@ -34,7 +36,6 @@ func main() {
 	opts.AddBroker(*mqttBroker)
 	client := mqtt.NewClient(opts)
 	// Establish a mqtt connection.
-
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		logger.WithFields(mqttLogFields).Fatalf("mqtt.Connect: %+v", token.Error())
 	}
@@ -42,6 +43,29 @@ func main() {
 
 	// Close mqtt connection when program exists.
 	defer client.Disconnect(250)
+
+	//execLogFields := logFileds{
+	//	"excec" : *..
+	//}
+/*
+	cmd := exec.Command("gpio", "write", "1", " 1")
+
+	execLogFields := log.Fields{
+              "excec" : *cmd,
+        }
+
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+
+	if err != nil {
+		logger.WithFields(execLogFields).Fatalf("cant change reset pin", err)
+	}else{
+		// give uC time to boot (need around 500 - 600ms)
+		time.Sleep(750 * time.Millisecond)
+		logger.WithFields(execLogFields).Infof("Changed /Reset Pin to 1")
+	}
+*/
 
 	spiLogFields := log.Fields{
 		"spi.dev":       *spiDev,
@@ -97,63 +121,40 @@ func main() {
 				return
 
 			}
+			crcValue := crc.ChecksumIBM(buf[1:])
+
+			//logger.WithFields(spiLogFields).Infof("CRC: %X",crcValue)
 			//logger.WithFields(spiLogFields).Infof("Bytes: %#X", buf[:])
-			msg, err := NewMessage(buf[:])
 
-//			logger.WithFields(spiLogFields).Infof("StatusFlags:\t\t %X",	msg.StatusFlags)
-//			logger.WithFields(spiLogFields).Infof("ErrorCode:\t\t %d",	msg.ErrorCode)
-//			logger.WithFields(spiLogFields).Infof("PlcID:\t\t %d",		msg.PlcID)
-//			logger.WithFields(spiLogFields).Infof("Freq.:\t\t %d", 	msg.Freq)
-//			logger.WithFields(spiLogFields).Infof("Counter:\t\t %d", 	msg.CounterValue)
-//			logger.WithFields(spiLogFields).Infof("CRC:\t\t %d", 		msg.Crc16)
+			if crcValue == 0xFFFF{
+				msg, err := NewMessage(buf[:])
+				if err != nil {
+					logger.WithFields(spiLogFields).Fatalf("NewMessage: %+v", err)
+					continue
+				}
 
-			if err != nil {
-				logger.WithFields(spiLogFields).Fatalf("NewMessage: %+v", err)
-				continue
+				//logger.WithFields(spiLogFields).Infof("Bytes: %q", buf[:])
+				messages <- msg // Put parsed message into channel.
+			}else{
+				logger.WithFields(spiLogFields).Errorf("CRC ERROR: %X", crcValue)
 			}
-
-			//logger.WithFields(spiLogFields).Infof("Bytes: %q", buf[:])
-			messages <- msg // Put parsed message into channel.
 			time.Sleep(250 * time.Millisecond)
 		}
 	}()
 
 	for msg := range messages { // Read from channel.
 		//logger.WithFields(mqttLogFields).WithField("mqtt.topic", msg.Topic).Infof("Send message: %s: %+v", msg.Topic, msg.Bytes()
-
-		topic := "sensors/gridBox/rpm"
-		if msg.Freq == 32776{
+		if msg.Freq == 32776  {
 			msg.Freq = 0
 		}
-		token := client.Publish(topic, 0x0, false, []byte(fmt.Sprintf("%d", msg.Freq)))
-		token.Wait()
-		if token.Error() != nil {
-			logger.WithFields(mqttLogFields).WithField("mqtt.topic", topic).
-				Errorf("mqtt.Publish(%s, %x: %+v", topic, msg.Freq, token.Error())
+		if msg.StatusFlags == 0 {
+			msg.PlcID = 0
 		}
-
-		topic = "sensors/gridBox/plcId"
-		token = client.Publish(topic, 0x0, false, []byte(fmt.Sprintf("%d", msg.PlcID)))
-                token.Wait()
-                if token.Error() != nil {
-                        logger.WithFields(mqttLogFields).WithField("mqtt.topic", topic).
-                                Errorf("mqtt.Publish(%s, %x: %+v", topic, msg.PlcID, token.Error())
-                }
-		topic = "sensors/gridBox/count"
-                token = client.Publish(topic, 0x0, false, []byte(fmt.Sprintf("%d", msg.CounterValue)))
-                token.Wait()
-                if token.Error() != nil {
-                        logger.WithFields(mqttLogFields).WithField("mqtt.topic", topic).
-                                Errorf("mqtt.Publish(%s, %x: %+v", topic, msg.CounterValue, token.Error())
-                }
-
-		topic = "sensors/gridBox/status"
-                token = client.Publish(topic, 0x0, false, []byte(fmt.Sprintf("%d", msg.StatusFlags)))
-                token.Wait()
-                if token.Error() != nil {
-                        logger.WithFields(mqttLogFields).WithField("mqtt.topic", topic).
-                                Errorf("mqtt.Publish(%s, %x: %+v", topic, msg.CounterValue, token.Error())
-                }
+		SendMqtt("sensors/gridBox/rpm", msg.Freq, client, logger, mqttLogFields)
+		SendMqtt("sensors/gridBox/plcId", msg.PlcID, client, logger, mqttLogFields)
+		SendMqtt("sensors/gridBox/count", msg.CounterValue, client,  logger, mqttLogFields)
+		SendMqtt("sensors/gridBox/status", msg.StatusFlags, client, logger, mqttLogFields)
+		time.Sleep(250 * time.Millisecond)
 	}
 }
 
@@ -166,6 +167,7 @@ type Message struct {
 	CounterValue	int;
 	Crc16		int;
 }
+
 
 // NewMessage converts SPI bytes into a message struct.
 func NewMessage(d []byte) (Message, error) {
@@ -185,10 +187,15 @@ func NewMessage(d []byte) (Message, error) {
 
 }
 
-// Bytes returns a byte representation of the value(s).
-func (m Message) Bytes() []byte {
-// For JSON output, remove comment
-	//d, _ := json.Marshal(m)
-	//return d
-	return []byte(fmt.Sprintf("%#X", m.PlcID))
+func SendMqtt(topic string, value int, client mqtt.Client,logger *log.Logger,fields log.Fields) error {
+	token := client.Publish(topic, 0x0, false, []byte(fmt.Sprintf("%d", value)))
+        token.Wait()
+
+//	logger.WithFields(fields).WithField("mqtt.topic", topic).Infof("Send message: %s: %+v", topic,value)
+
+	if token.Error() != nil {
+	        logger.WithFields(fields).WithField("mqtt.topic", topic).Errorf("mqtt.Publish(%s, %x: %+v", topic, value, token.Error())
+        }
+	return token.Error()
 }
+
